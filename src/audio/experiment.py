@@ -1,43 +1,45 @@
 """Leakage-aware baseline training and final held-out evaluation."""
 
-from typing import Any
-
-from sklearn.linear_model import LogisticRegression
+import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
-from audio.splits import split_data
+from audio.acoustic_models import ClassConditionalHMM
+from audio.splits import split_sequence_indices
 
 
-def run_experiment(X: Any, y: Any, *, random_state: int = 42) -> dict[str, float]:
-    """Select with validation data, refit on train+validation, test once."""
-    parts = split_data(X, y, random_state=random_state)
-    model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
-    model.fit(parts.X_train, parts.y_train)
+def run_experiment(
+    sequences: np.ndarray, labels: np.ndarray, *, random_state: int = 42
+) -> dict[str, float]:
+    """Fit class-conditional GMM-HMMs on train, select on validation, test last."""
+    if sequences.ndim != 3:
+        raise ValueError("features must have shape (utterances, frames, coefficients)")
+    labels = np.asarray(labels)
+    if len(sequences) != len(labels):
+        raise ValueError("features and labels must have matching utterance counts")
+    train_idx, validation_idx, test_idx = split_sequence_indices(
+        labels, random_state=random_state
+    )
+    train_sequences = [sequences[index] for index in train_idx]
+    train_labels = labels[train_idx].astype(str).tolist()
+    validation_sequences = [sequences[index] for index in validation_idx]
+    validation_labels = labels[validation_idx].astype(str)
+    model = ClassConditionalHMM(random_state=random_state).fit(
+        train_sequences, train_labels
+    )
+    validation_predictions = model.predict(validation_sequences)
     validation_score = f1_score(
-        parts.y_validation, model.predict(parts.X_validation), average="weighted"
+        validation_labels, validation_predictions, average="weighted", zero_division=0
     )
-    model.fit(
-        _concat(parts.X_train, parts.X_validation),
-        _concat(parts.y_train, parts.y_validation),
+    final_idx = np.concatenate([train_idx, validation_idx])
+    final_model = ClassConditionalHMM(random_state=random_state).fit(
+        [sequences[index] for index in final_idx], labels[final_idx].astype(str).tolist()
     )
-    predictions = model.predict(parts.X_test)
+    test_predictions = final_model.predict([sequences[index] for index in test_idx])
+    test_labels = labels[test_idx].astype(str)
     return {
         "validation_f1_weighted": float(validation_score),
-        "test_accuracy": float(accuracy_score(parts.y_test, predictions)),
+        "test_accuracy": float(accuracy_score(test_labels, test_predictions)),
         "test_f1_weighted": float(
-            f1_score(parts.y_test, predictions, average="weighted")
+            f1_score(test_labels, test_predictions, average="weighted", zero_division=0)
         ),
     }
-
-
-def _concat(left: Any, right: Any) -> Any:
-    """Concatenate NumPy-like or pandas inputs without changing their rows."""
-    if hasattr(left, "iloc"):
-        import pandas as pd
-
-        return pd.concat([left, right], axis=0)
-    import numpy as np
-
-    return np.concatenate([left, right], axis=0)

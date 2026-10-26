@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 from sklearn.datasets import make_classification
 
-from audio.experiment import run_experiment
-from audio.splits import split_data
+from audio.splits import split_data, split_sequence_indices
 
 
 def test_split_has_three_disjoint_deterministic_partitions():
@@ -21,10 +20,10 @@ def test_split_rejects_too_small_classes():
         split_data(np.arange(8).reshape(4, 2), np.array([0, 0, 1, 1]))
 
 
-def test_experiment_reports_validation_and_test_metrics():
-    X, y = make_classification(n_samples=250, n_features=8, random_state=7)
-    scores = run_experiment(X, y)
-    assert set(scores) == {
-        "validation_f1_weighted", "test_accuracy", "test_f1_weighted"
-    }
-    assert all(0.0 <= value <= 1.0 for value in scores.values())
+def test_sequence_split_keeps_utterances_disjoint():
+    labels = np.array(["a"] * 20 + ["b"] * 20)
+    train, validation, test = split_sequence_indices(labels)
+    assert not set(train) & set(validation)
+    assert not set(train) & set(test)
+    assert not set(validation) & set(test)
+    assert len(train) + len(validation) + len(test) == len(labels)

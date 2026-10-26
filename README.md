@@ -14,12 +14,12 @@ Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
-uv run python scripts/train.py
+uv run python scripts/train.py --data data/processed/features.npz
 uv run pytest
 uv run ruff check .
 ```
 
-The demo uses generated toy data only. Replace it with data you are allowed to use, record its source and license, and keep private or raw data out of Git.
+The audio training command expects a local NPZ with `features` shaped `(utterances, frames, coefficients)` and one string `labels` entry per utterance. Extract features from recordings you are allowed to use, record their source and license, and keep recordings and feature arrays out of Git. The command does not download data.
 
 ## Data and evaluation
 

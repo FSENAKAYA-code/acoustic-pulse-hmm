@@ -1,7 +1,12 @@
 """Leakage-aware baseline training and final held-out evaluation."""
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 
 from audio.acoustic_models import ClassConditionalHMM
 from audio.splits import split_sequence_indices
@@ -27,6 +32,10 @@ def run_experiment(
         train_sequences, train_labels
     )
     validation_predictions = model.predict(validation_sequences)
+    train_loss = _mean_negative_log_likelihood(model, train_sequences, train_labels)
+    validation_loss = _mean_negative_log_likelihood(
+        model, validation_sequences, validation_labels.tolist()
+    )
     validation_score = f1_score(
         validation_labels, validation_predictions, average="weighted", zero_division=0
     )
@@ -37,9 +46,30 @@ def run_experiment(
     test_predictions = final_model.predict([sequences[index] for index in test_idx])
     test_labels = labels[test_idx].astype(str)
     return {
+        "train_loss_nll": float(train_loss),
+        "validation_loss_nll": float(validation_loss),
         "validation_f1_weighted": float(validation_score),
         "test_accuracy": float(accuracy_score(test_labels, test_predictions)),
+        "test_precision_weighted": float(
+            precision_score(test_labels, test_predictions, average="weighted", zero_division=0)
+        ),
+        "test_recall_weighted": float(
+            recall_score(test_labels, test_predictions, average="weighted", zero_division=0)
+        ),
         "test_f1_weighted": float(
             f1_score(test_labels, test_predictions, average="weighted", zero_division=0)
         ),
     }
+
+
+def _mean_negative_log_likelihood(
+    model: ClassConditionalHMM, sequences: list[np.ndarray], labels: list[str]
+) -> float:
+    return float(
+        np.mean(
+            [
+                -model.models[label].score(sequence) / max(len(sequence), 1)
+                for sequence, label in zip(sequences, labels, strict=True)
+            ]
+        )
+    )

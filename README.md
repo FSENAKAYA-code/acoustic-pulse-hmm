@@ -28,6 +28,12 @@ The audio training command expects a local NPZ with `features` shaped `(utteranc
 - Fit preprocessing steps on training data only. Use validation results for model selection; report the test result once for the chosen configuration.
 - Check the project's `src/audio/` code and tests before adapting it to real data.
 
+## Domain workflow
+
+- `audio.features.extract_acoustic_features` computes MFCC coefficients plus spectral centroid from an in-memory mono signal using librosa.
+- Save padded/consistent feature sequences as a local NPZ with `features` shaped `(utterances, frames, coefficients)` and `labels` shaped `(utterances,)`, then run the Quick start command. The splitter keeps utterances intact and stratifies labels.
+- Class-conditional GMM-HMMs train on the training sequences; validation selects/evaluates the fit; the test set is held out for final accuracy, weighted precision, recall, and F1. Mean negative log likelihood is reported for train and validation.
+
 ## Repository layout
 
 ```text

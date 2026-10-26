@@ -1,5 +1,3 @@
 # Domain implementation notes
 
-A feature-based audio recognition scaffold. It documents MFCC-style feature sequences and an optional GMM-HMM route; no recordings are included.
-
-The shared baseline in `src/audio/` is executable now. Domain-specific model implementations are planned work and must be evaluated using documented data splits.
+The feature helper extracts MFCCs and spectral centroid with librosa. Class-conditional GMM-HMM models consume utterance-level features; stratified utterance splits keep sequences intact, and evaluation reports train/validation negative log likelihood and held-out classification metrics. No recordings or extracted arrays are included.
